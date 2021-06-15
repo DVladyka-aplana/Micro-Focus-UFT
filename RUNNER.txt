@@ -1,0 +1,201 @@
+Dim test, TestName, ActionName, TestDescription, TestResult
+
+'Подготовка HTML отчета
+Set FSO = CreateObject("Scripting.FileSystemObject")
+path = "C:\Users\testday\Documents\bitbucket\output\TestResults.html"
+FSO.DeleteFile path
+Set report = FSO.OpenTextFile(path,8,True)
+createReportHeader()
+
+'Закрыть все процессы UFT
+ConsoleOutputBlankLine(1)
+Call KillProcess("UFT.exe")
+Call KillProcess("QtpAutomationAgent.exe")
+WScript.Sleep 10000
+'Открыть приложение UFT
+'ConsoleOutputBlankLine(1)
+'Set QTP = CreateObject("QuickTest.Application")
+
+'Массив автотестов
+Dim MyArray(13)
+MyArray(0) = "Z_UVHDP_PLITKI"
+MyArray(1) = "Z_UVHDP_BR_CHECK_FORMS"
+'MyArray(1) = "Z_UVHDP_BR_DEKART"
+'MyArray(1) = "Z_UVHDP_BZ_DEKART"
+MyArray(2) = "Z_UVHDP_PKP_VLB_BANK_2"
+MyArray(3) = "Z_UVHDP_PKP_VLB_TB"
+MyArray(4) = "Z_UVHDP_PKP_VKV_2"
+MyArray(5) = "Z_UVHDP_KOR_CHIS_ROT"
+MyArray(6) = "Z_UVHDP_KOR"
+MyArray(7) = "Z_UVHDP_OUVHD_CNR"
+MyArray(8) = "Z_UVHDP_OUVHD_B"
+MyArray(9) = "Z_UVHDP_OUVHD_SR"
+MyArray(10) = "Z_UVHDP_OUVHD_PS"
+MyArray(11) = "Z_UVHDP_AGILE_GP_ROTBS_SOSA"
+MyArray(12) = "Z_UVHDP_AGILE_GP_ROTIT_2"
+MyArray(13) = "Z_UVHDP_AGILE_GP_OP_CA_2"
+
+'ConsoleOutput("Loading UFT...")
+'QTP.Launch
+'QTP.Visible = TRUE
+
+''''''Цикл запусков''''''
+For i = 0 to 13
+test = MyArray(i)
+'Открыть тест UFT
+ConsoleOutput("Loading UFT...")
+Set QTP = CreateObject("QuickTest.Application")
+QTP.Launch
+QTP.Visible = TRUE
+ConsoleOutput("Loading test: " & test)
+QTP.Open "C:\Users\testday\Documents\bitbucket\tests\" & test, FALSE
+'Объявить переменные для инициализации тестов
+QTP.Test.Environment.Value("JenkinsFlag") = "N"
+QTP.Test.Environment.Value("JenkinsActionName") = ""
+QTP.Test.Environment.Value("JenkinsTestCaseDescription") = ""
+QTP.Test.Environment.Value("JenkinsTestCaseResult") = ""
+
+'Указать место хранения Результатов
+Set qtpResultsOpt = CreateObject("QuickTest.RunResultsOptions")
+qtpResultsOpt.ResultsLocation = "C:\Users\testday\Documents\bitbucket\output\" & test 'Set the results location
+ConsoleOutput("Full report location: C:\Users\testday\Documents\bitbucket\output\" & test)
+
+'Запуск автотеста UFT
+ConsoleOutput("Running test...")
+QTP.Test.Run qtpResultsOpt, FALSE
+
+'Записать результаты прогона в консоль
+While QTP.Test.isRunning
+    If QTP.Test.Environment.Value("JenkinsFlag") = "Y" Then
+        QTP.Test.Environment.Value("JenkinsFlag") = "N"
+        ' Test name and description
+        WScript.StdOut.Write Time() & " :: " &  QTP.Test.Environment.Value("JenkinsTestName") & " - " & QTP.Test.Environment.Value("JenkinsTestCaseDescription") & " - "
+        TestName = QTP.Test.Environment.Value("JenkinsTestName")
+		ActionName = QTP.Test.Environment.Value("JenkinsActionName")
+		TestDescription = QTP.Test.Environment.Value("JenkinsTestCaseDescription")
+        'Wait till the test is executed & result is updated
+        While (QTP.Test.Environment.Value("JenkinsTestCaseResult") = "" AND QTP.Test.isRunning)
+                WScript.Sleep 1000
+        Wend
+        'Show the Result
+        WScript.StdOut.WriteLine QTP.Test.Environment.Value("JenkinsTestCaseResult")
+		TestResult = QTP.Test.Environment.Value("JenkinsTestCaseResult")
+		UpdateTestCaseInfo TestName, ActionName, TestDescription
+        UpdateTestCaseResult(TestResult)
+    End If
+    WScript.Sleep 1000
+Wend
+
+'Закрыть тест
+ConsoleOutputBlankLine(1)
+Call KillProcess("UFT.exe")
+Call KillProcess("QtpAutomationAgent.exe")
+WScript.Sleep 10000
+
+Next
+''''''Цикл автотестов''''''
+
+'ConsoleOutput("Closing UFT...")
+'Call KillProcess("UFT.exe")
+'Call KillProcess("QtpAutomationAgent.exe")
+report.WriteLine("</tbody></thead></table>")
+ConsoleOutput("Executing end!")
+
+
+'Функции
+Sub ConsoleOutput(ByVal MessageToBeDisplayed)
+	WScript.StdOut.WriteLine Time() & " :: " & MessageToBeDisplayed
+End Sub
+
+Sub ConsoleOutputBlankLine(ByVal intNo)
+	WScript.StdOut.WriteBlankLines(intNo)
+End Sub
+
+Sub KillProcess(ByVal ProcessName)	
+	On Error Resume Next
+	Dim objWMIService : Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+	Dim colProcesses : Set colProcesses = objWMIService.ExecQuery("SELECT * FROM Win32_Process WHERE Name='" &  ProcessName & "'")
+	ConsoleOutput("Terminating Process : " & ProcessName)
+	For Each objProcess in colProcesses
+		intTermProc = objProcess.Terminate
+	Next
+	On Error GoTo 0
+End Sub
+
+Sub Initialize ()
+	Set FSO = CreateObject("Scripting.FileSystemObject")
+	path = "C:\Users\testday\Documents\bitbucket\tests\TestResults.html"
+	Set report = FSO.OpenTextFile(path,8,True)
+	createReportHeader()
+End Sub
+
+Sub Terminate ()
+	report.WriteLine("</tbody></thead></table>")
+End Sub
+
+Sub createReportHeader()
+	report.WriteLine("<table style='width: 930px;margin: 0;padding: 0;table-layout: fixed;border-collapse: collapse;font: 11px/1.4 Trebuchet MS;'>")
+	report.WriteLine("<thead style='margin: 0;padding: 0;'>")
+	report.WriteLine("<tr style='margin: 0;padding: 0;'>")
+	report.WriteLine("<th style='width: 100px;margin: 0;padding: 6px;background: #333;color: white;font-weight: bold;border: 1px solid #ccc;text-align: auto;'>Test Name</th>")
+	report.WriteLine("<th style='width: 100px;margin: 0;padding: 6px;background: #333;color: white;font-weight: bold;border: 1px solid #ccc;text-align: auto;'>ActionName</th>")
+	report.WriteLine("<th style='width: 100px;margin: 0;padding: 6px;background: #333;color: white;font-weight: bold;border: 1px solid #ccc;text-align: auto;'>Time</th>")
+	report.WriteLine("<th style='width: 400px;margin: 0;padding: 6px;background: #333;color: white;font-weight: bold;border: 1px solid #ccc;text-align: auto;'>TestCase Description</th>")
+	report.WriteLine("<th style='width: 100px;margin: 0;padding: 6px;background: #333;color: white;font-weight: bold;border: 1px solid #ccc;text-align: auto;'>Status</th>")
+	report.WriteLine("</tr>")
+	report.WriteLine("</thead><tbody style='margin: 0;padding: 0;'>")
+End Sub
+
+Sub UpdateTestCaseInfo(ByVal TestName, ByVal ActionName, ByVal TestDescription)
+	report.WriteLine("<tr style='margin: 0;padding: 0;'>")
+	report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #FFFFFF;'><b>" & TestName & "</b></td>")
+	report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #FFFFFF;'><b>" & ActionName & "</b></td>")
+	report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #FFFFFF;'><b>" & now & "</b></td>")
+	report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #FFFFFF;'>" & TestDescription & "</td>")
+End Sub
+	
+Sub UpdateTestCaseResult(ByVal TestResult)
+	If TestResult = "PASS" Then
+		report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #99FF99;'>PASSED</td>")
+	Else
+		report.WriteLine("<td style='margin: 0;padding: 6px;border: 1px solid #ccc;text-align: left;background: #FFB2B2;'>FAIL</td>")
+	End If
+		report.WriteLine("</tr>")
+End Sub
+
+Sub UpdateOutZip(ByVal TestName, ByVal TestResult)
+	If TestResult = "PASS" or TestName = "Z_UVHDP_PLITKI" Then
+	
+	Else
+		Set sApp = CreateObject("Shell.Application")
+        sApp.NameSpace("C:\Users\testday\Documents\bitbucket\output\FAILS").CopyHere "C:\Users\testday\Documents\bitbucket\output\"&TestName
+	End If
+		
+End Sub
+
+Sub ArchiveFolder (ByVal zipFile, ByVal sFolder)
+
+    With CreateObject("Scripting.FileSystemObject")
+        zipFile = .GetAbsolutePathName(zipFile)
+        sFolder = .GetAbsolutePathName(sFolder)
+
+        With .CreateTextFile(zipFile, True)
+            .Write Chr(80) & Chr(75) & Chr(5) & Chr(6) & String(18, chr(0))
+        End With
+    End With
+
+    With CreateObject("Shell.Application")
+        .NameSpace(zipFile).CopyHere .NameSpace(sFolder).Items
+
+        Do Until .NameSpace(zipFile).Items.Count = _
+                 .NameSpace(sFolder).Items.Count
+            WScript.Sleep 1000 
+        Loop
+    End With
+
+End Sub
+
+Sub ReportEvent(ByVal TCID, ByVal TestDescription, ByVal TestStatus)
+	UpdateTestCaseInfo TCID, TestDescription
+	UpdateTestCaseResult(TestResult)
+End Sub
